@@ -1,11 +1,12 @@
-unbound:
-  cfgfile: testFile
-  server: 127.0.0.1@8009
-collector:
-  name: UnboundDNS
-  controlPath: ./
-  entityName: resolver1
-  entityType: APPLICATION
-  displayName: TestResolver
-#  debug: true
-#  reset: false
+resolvers:
+  unbound:
+    cfgfile: testFile
+    server: 127.0.0.1@8009
+    controlPath: ./
+  collector:
+    entityName: resolver1
+    entityType: APPLICATION
+    displayName: TestResolver
+  #  debug: true
+  #  reset: false
+  
