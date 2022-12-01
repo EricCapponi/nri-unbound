@@ -170,7 +170,7 @@ func main() {
 	for scanner.Scan() {
 		var metricValues = strings.Split(scanner.Text(), "=")
 		var newMetric metricsType
-		newMetric.Name = metricValues[0]
+		newMetric.Name = "unbound." + metricValues[0]
 		newMetric.Type = "cumulative-count"
 		newMetric.Value, err = strconv.ParseFloat(metricValues[1], 64)
 		if err != nil {
