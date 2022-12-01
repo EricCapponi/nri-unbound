@@ -1,0 +1,18 @@
+instances:
+  cfgfile: testFile
+  server: 127.0.0.1@8009
+  controlPath: /var/db/newrelic-infra/custom-integrations/
+  entityName: resolver1
+  entityType: APPLICATION
+  displayName: TestResolver
+  mock: true
+  metadata:
+    - key: ASV
+      value: ASVTEST
+    - key: env
+      value: dev
+    - key: owner
+      value: dev@ops.com
+
+  #  debug: true
+  #  reset: false

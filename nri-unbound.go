@@ -15,24 +15,34 @@ import (
 
 // const settingsFile = "unboundCollector.yml"
 
-const settingsFile = "/var/db/newrelic-infra/custom-integrations/unboundCollector.yml"
+const (
+
+	// The seetings file without a path is used in the dev environment
+	settingsFile = "/var/db/newrelic-infra/custom-integrations/nri-unbound-config.yml"
+	// settingsFile       = "nri-unbound-config.yml"
+	// EntityType         = "UnboundDNSResolver"
+	EntityType         = "APPLICATION"
+	integrationName    = "nri-unbound"
+	integrationVersion = "0.1.0"
+)
 
 var unboundControl = "unbound-control"
 
 type settings struct {
-	Unbound struct {
-		Cfgfile string
-		Server  string
-	}
-	Collector struct {
-		Name        string `yaml:"name"`
+	Instances struct {
 		ControlPath string `yaml:"controlPath"`
+		Cfgfile     string
+		Server      string
 		EntityName  string `yaml:"entityName"`
-		EntityType  string `yaml:"entityType"`
 		DisplayName string `yaml:"displayName"`
 		Debug       bool   `yaml:"debug,omitempty"`
 		Reset       bool   `yaml:"reset,omitempty"`
-		// TODO add metatdata, an array of key : value pairs
+		Mock        bool   `yaml:"mock,omitempty"`
+		// Metadata    struct{} `yaml:"metadata"`
+		Metadata []struct {
+			Key   string `yaml:"key"`
+			Value string `yaml:"value"`
+		} `yaml:"metadata"`
 	}
 }
 
@@ -42,14 +52,21 @@ type metricsType struct {
 	Value      float64  `json:"value"`
 	Attrinutes struct{} `json:"attributes"`
 }
+
 type entityType struct {
 	Entity struct {
-		Name        string   `json:"name"`
-		Type        string   `json:"type"`
-		DisplayName string   `json:"displayName"`
-		Metadata    struct{} `json:"metadata"`
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		DisplayName string `json:"displayName"`
+		// Metadata    struct{} `json:"metadata"`
+		Metadata map[string]string `json:"metadata"`
 	}
 	Metrics []metricsType
+}
+
+type Tags struct {
+	Key   string `yaml:"key"`
+	Value string `yaml:"value"`
 }
 
 type payloadType struct {
@@ -62,14 +79,15 @@ type payloadType struct {
 }
 
 func loadSettings(filename string) (*settings, error) {
-	buf, err := ioutil.ReadFile(settingsFile)
+
+	buf, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("in file %q: %w", settingsFile, err)
+		return nil, fmt.Errorf("cannot open config file %q: %w", filename, err)
 	}
 
 	c := &settings{}
 	err = yaml.Unmarshal(buf, c)
-	//err = yaml.v3.Unmarshal(buf, c)
+
 	if err != nil {
 		return nil, fmt.Errorf("in file %q: %w", filename, err)
 	}
@@ -95,31 +113,53 @@ func main() {
 	// Start to build the payload
 	var payload payloadType
 	payload.Protocol_version = "4"
-	payload.Integration.Name = settings.Collector.Name
-	payload.Integration.Version = "0.1"
+	payload.Integration.Name = "nri-unbound"
+	payload.Integration.Version = "1.1"
 
-	var entity entityType
-	entity.Entity.Name = settings.Collector.EntityName
-	entity.Entity.Type = settings.Collector.EntityType
-	entity.Entity.DisplayName = settings.Collector.DisplayName
+	var entityClass entityType
+	entityClass.Entity.Name = settings.Instances.EntityName
+	entityClass.Entity.Type = EntityType
+	entityClass.Entity.DisplayName = settings.Instances.DisplayName
 
-	payload.Data = append(payload.Data, entity)
+	// Add the metadata
+	attribs := make(map[string]string)
+
+	for _, s := range settings.Instances.Metadata {
+		attribs[s.Key] = s.Value
+	}
+	entityClass.Entity.Metadata = attribs
+
+	// Add the entity to the payload
+	payload.Data = append(payload.Data, entityClass)
 
 	// build the parameter list for the command
 	var args string
 
-	if settings.Unbound.Cfgfile != "" {
-		args = "-c " + settings.Unbound.Cfgfile
+	// TODO Add all other availabe command lne args for unbound-control
+
+	args = "stats"
+	if settings.Instances.Cfgfile != "" {
+		args += " -c " + settings.Instances.Cfgfile
 	}
-	if settings.Unbound.Server != "" {
-		if args != "" {
-			args += " "
-		}
-		args += "-s " + settings.Unbound.Server
+	if settings.Instances.Server != "" {
+		args += " -s " + settings.Instances.Server
 	}
 
 	// Run the command to collect metircs
-	cmdStruct := exec.Command(settings.Collector.ControlPath+unboundControl, args)
+
+	// If we are in a dev environment we can specify mock: true in the config.yml
+	// to run the mock unbound-command
+	if settings.Instances.Mock {
+		unboundControl += "-mock"
+	}
+
+	// If a path to unbound-control has been specified add it to the command
+	if settings.Instances.ControlPath != "" {
+		unboundControl = settings.Instances.ControlPath + unboundControl
+	}
+
+	// Execute unbound-control
+	cmdStruct := exec.Command(unboundControl, args)
 	metrics, err := cmdStruct.Output()
 	if err != nil {
 		fmt.Println(err)
@@ -139,11 +179,9 @@ func main() {
 		payload.Data[0].Metrics = append(payload.Data[0].Metrics, newMetric)
 	}
 
-	// // run the command
-
 	// Output the payload
 
-	if settings.Collector.Debug {
+	if settings.Instances.Debug {
 		btResult, _ := json.MarshalIndent(&payload, "", "  ")
 		fmt.Println(string(btResult))
 	} else {

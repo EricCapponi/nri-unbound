@@ -1,0 +1,7 @@
+scp -i ~/Downloads/ericC_Unbound_resolver_Key.pem nri-unbound-config.yml ec2-user@ec2-18-216-172-68.us-east-2.compute.amazonaws.com:/var/db/newrelic-infra/custom-integrations
+scp -i ~/Downloads/ericC_Unbound_resolver_Key.pem nri-unbound.yml ec2-user@ec2-18-216-172-68.us-east-2.compute.amazonaws.com:/var/db/newrelic-infra/custom-integrations
+GOOS=linux GOARCH=386 go build -o nri-unbound
+
+Get New Relic SDK:
+go get github.com/newrelic/infra-integrations-sdk/...
+
